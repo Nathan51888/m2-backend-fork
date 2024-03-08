@@ -9,6 +9,7 @@
     https://github.com/ntLeo/Mission-2/blob/main/src/components/ai-with-image.tsx
 
 */
+require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
@@ -16,7 +17,7 @@ const path = require('path');
 const vision = require('@google-cloud/vision');
 const {GoogleGenerativeAI} = require('@google/generative-ai');
 
-const genAI = new GoogleGenerativeAI('AIzaSyCu8vr13DVYflfjsjl9xRN6nwjRBE6LoO8');
+const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 
 // ---------------------------------------------------------------- //
 // --------------------- SAVE IMAGE TO SERVER --------------------- //
@@ -37,9 +38,9 @@ async function saveImageToServer(file) {
         console.log('Image saved as:', fileName);
 
         return fileName;
-        // TODO fix fileName being passed as undefined / promise
     });
-    return name;
+
+    return await name;
 }
 // ---------------------------------------------------------------- //
 // ----------------------- SERVER CLEAN UP ------------------------ //
@@ -96,7 +97,7 @@ function fileToGenerativePart(path, mimeType) {
 }
 async function aiGenerativeAnalysis(imageName) {
     const imagesFolderPath = '../backend/multerImages/';
-
+    console.log(imageName);
     const model = genAI.getGenerativeModel({model: 'gemini-pro-vision'});
     const prompt = 'What is this car brand and model? What are similar cars? Give me as a json file.';
     // const image = fileToGenerativePart(imagesFolderPath + imageName, 'image/jpeg');
