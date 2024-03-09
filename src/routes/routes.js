@@ -4,7 +4,7 @@ const router = express.Router();
 
 // MULTER => FILES HANDLER
 const multer = require('multer');
-const upload = multer({dest: 'temp/'});
+const upload = multer({dest: 'tempImages/'}); // Multer Shadow files location => Go to controller.js l-29 for details
 
 // CONTROLLERS IMPORTS
 const analyseCarImage = require('../controllers/controller');

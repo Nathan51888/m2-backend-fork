@@ -9,70 +9,83 @@
     https://github.com/ntLeo/Mission-2/blob/main/src/components/ai-with-image.tsx
 
 */
+
+// ---------------------------------------------------------------- //
+// ---------------------- IMPORTS AND SETUP ----------------------- //
+// ---------------------------------------------------------------- //
+
+// .ENV SETUP
 require('dotenv').config();
 
+// IMPORTS
 const fs = require('fs');
 const path = require('path');
-// Imports the Google Cloud client library
-const vision = require('@google-cloud/vision');
 const {GoogleGenerativeAI} = require('@google/generative-ai');
 
+// AI CLIENT
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+
+// --------------------------- SETTINGS --------------------------- //
+
+/* 
+    The images are briefly saved on the server side then are analysed and finally deleted.
+    That's the IMAGES_PATH location 
+    The prompt is how the AI will handler the images, what is being asked for it to do.
+
+    Here I am handling images that are not a car on the prompt itself. And also limiting the 
+    format i want my response so I can conscistently work with it on the frontend.
+*/
+
+const IMAGES_PATH = '../backend/tempImages/';
+const prompt =
+    'What is this car brand and model? What are similar cars? Give me as a json file with that exact keys: model, brand, similar_cars. If the image is not a car return {error: "The image is not of a car. Please pick a different image."}';
 
 // ---------------------------------------------------------------- //
 // --------------------- SAVE IMAGE TO SERVER --------------------- //
 // ---------------------------------------------------------------- //
 
-async function saveImageToServer(file) {
-    // Read the uploaded file and save it
-    const name = fs.readFile(file.path, (err, data) => {
-        if (err) {
-            console.error('Error reading uploaded file:', err);
-            return res.status(500).send('Error reading uploaded file.');
-        }
+function saveImageToServer(file) {
+    /* 
+        Because fs is Async this function had to be Promisified So I could 
+        retrieve the fileName value.
 
-        // Save the file with a unique name
-        const fileName = `image_${Date.now()}.jpeg`;
-        fs.writeFileSync('multerImages/' + fileName, data);
+        fileName is how the AI Client will pick the image to analyse on the server 
+    */
+    return new Promise((resolve, reject) => {
+        fs.readFile(file.path, (err, data) => {
+            if (err) {
+                console.error('Error reading uploaded file:', err);
+                reject('Error reading uploaded file.');
+                return;
+            }
 
-        console.log('Image saved as:', fileName);
-
-        return fileName;
+            // Save the file with a unique name
+            const fileName = `image_${Date.now()}.jpeg`;
+            try {
+                fs.writeFileSync('tempImages/' + fileName, data);
+                console.log('Image saved as:', fileName);
+                resolve(fileName);
+            } catch (writeErr) {
+                console.error('Error while saving image file on server.\n', writeErr);
+                reject('Error saving file');
+            }
+        });
     });
-
-    return await name;
 }
+
 // ---------------------------------------------------------------- //
 // ----------------------- SERVER CLEAN UP ------------------------ //
 // ---------------------------------------------------------------- //
 
 const cleanUpTempFiles = () => {
     // DELETE MULTER IMAGES FILES
-    const imagesFolderPath = '../../multerImages/'; // Replace this with the path to your folder
-    fs.readdir(imagesFolderPath, (err, files) => {
+    fs.readdir(IMAGES_PATH, (err, files) => {
         if (err) return console.error('Error reading folder:', err);
 
         // DELETE MULTER DOWNLOADED IMAGES
         files.forEach(file => {
             // Construct the full path of the file
-            const filePath = path.join(imagesFolderPath, file);
-            // Delete the file
-            fs.unlink(filePath, err => {
-                if (err) return console.error('Error deleting file:', err);
-                console.log('File deleted:', filePath);
-            });
-        });
-    });
-
-    // DELETE MULT TEMP FILES
-    const tempFolderPath = '../../temp/'; // Replace this with the path to your folder
-    fs.readdir(tempFolderPath, (err, files) => {
-        if (err) return console.error('Error reading folder:', err);
-
-        // DELETE MULTER DOWNLOADED IMAGES
-        files.forEach(file => {
-            // Construct the full path of the file
-            const filePath = path.join(tempFolderPath, file);
+            const filePath = path.join(IMAGES_PATH, file);
             // Delete the file
             fs.unlink(filePath, err => {
                 if (err) return console.error('Error deleting file:', err);
@@ -96,43 +109,33 @@ function fileToGenerativePart(path, mimeType) {
     };
 }
 async function aiGenerativeAnalysis(imageName) {
-    const imagesFolderPath = '../backend/multerImages/';
-    console.log(imageName);
     const model = genAI.getGenerativeModel({model: 'gemini-pro-vision'});
-    const prompt = 'What is this car brand and model? What are similar cars? Give me as a json file.';
-    // const image = fileToGenerativePart(imagesFolderPath + imageName, 'image/jpeg');
-    /* 
-        The image is hardcoded here until I figure how to pass the promise of the image name, So i can:
-         save it to the server, 
-         analyse, 
-         send the response back 
-         and clean up the server 
-    
-    */
-    /* 
-        At this point past the name of the image on the multerImages folder to see your image analysed
-   */
-    const image = fileToGenerativePart('../backend/multerImages/image_1709809158651.jpeg', 'image/jpeg');
+    // prompt was initialized on line 37 - SETTINGS but I left it here for reference.
+    // const prompt = 'What is this car brand and model? What are similar cars? Give me as a json file.';
+    const image = fileToGenerativePart(IMAGES_PATH + imageName, 'image/jpeg');
 
     const result = await model.generateContent([prompt, image]);
+
+    // Clear string response and convert to JSON
     const response = result.response;
     const text = response.text().replaceAll('```', '').replace('json', '');
     const jsonRes = JSON.parse(text);
+
     return jsonRes;
 }
 
 // ---------------------------------------------------------------- //
 // ----------------------- ANALYSE CAR API ------------------------ //
 // ---------------------------------------------------------------- //
+
 async function analyseCarImage(req, res) {
     const file = req.file;
     if (!file) return res.status(400).send('No file uploaded.');
 
     const fileName = await saveImageToServer(file);
     const analysisResult = await aiGenerativeAnalysis(fileName);
-    console.log(await analysisResult);
 
-    // cleanUpTempFiles();
+    cleanUpTempFiles();
 
     res.status(200).send(await analysisResult);
 }
