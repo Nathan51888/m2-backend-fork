@@ -36,7 +36,7 @@ const genAI = new GoogleGenerativeAI(process.env.API_KEY);
     format i want my response so I can conscistently work with it on the frontend.
 */
 
-const IMAGES_PATH = '../backend/tempImages/';
+const IMAGES_PATH = './tempImages/';
 const prompt =
     'What is this car brand and model? What are similar cars? Give me as a json file with that exact keys: model, brand, similar_cars. If the image is not a car return {error: "The image is not of a car. Please pick a different image."}';
 
